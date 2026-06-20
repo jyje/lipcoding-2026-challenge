@@ -14,6 +14,12 @@ export interface AnalysisResult {
   topActions: Action[];
   planBlocks: Array<{ title: string; duration: number; actions: Action[] }>;
   risks: string[];
+  tag: {
+    space: 'work' | 'career' | 'tech';
+    careerSignals: string[];
+    keywords: string[];
+    confidence: number;
+  };
 }
 
 export async function analyzeBrainDump(
@@ -30,6 +36,7 @@ export async function analyzeBrainDump(
    - Priority level (1=critical, 2=important, 3=nice-to-have)
 3. Potential risks or blockers to address
 4. Time blocks to organize the plan based on the given budget
+5. Categorization (work/career/tech), career signals, and keywords
 
 Respond in valid JSON format matching this schema:
 {
@@ -51,7 +58,13 @@ Respond in valid JSON format matching this schema:
       "actions": [/* Action objects */]
     }
   ],
-  "risks": ["string"]
+  "risks": ["string"],
+  "tag": {
+    "space": "work" | "career" | "tech",
+    "careerSignals": ["string"],
+    "keywords": ["string"],
+    "confidence": 0.0 - 1.0
+  }
 }`;
 
   try {
@@ -77,6 +90,12 @@ Respond in valid JSON format matching this schema:
       topActions: parsed.topActions || [],
       planBlocks: parsed.planBlocks || [],
       risks: parsed.risks || [],
+      tag: parsed.tag || {
+        space: 'work',
+        careerSignals: [],
+        keywords: [],
+        confidence: 0.5,
+      },
     };
   } catch (error) {
     console.error('Error calling Copilot SDK:', error);

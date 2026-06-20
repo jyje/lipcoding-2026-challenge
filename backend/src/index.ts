@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import { initializeDatabase } from './database';
 import { registerUserRoutes } from './routes/user';
 import { analyzeBrainDump } from './services/analyzeService';
+import { authenticateBearer } from './middleware/auth';
 import 'dotenv/config';
 
 const app = Fastify({ logger: true });
@@ -14,29 +15,64 @@ app.get('/health', async (request, reply) => {
   return { status: 'healthy', timestamp: new Date().toISOString() };
 });
 
-// Analyze endpoint
+// Analyze endpoint (v1)
 app.post<{
   Body: {
-    brainDump: string;
-    timeBudgetMin?: number;
+    brain_dump: string;
+    time_budget_min?: number;
   };
-}>('/api/analyze', async (request, reply) => {
-  const { brainDump, timeBudgetMin = 120 } = request.body;
+}>('/api/v1/analyze', async (request, reply) => {
+  const token = await authenticateBearer(request, reply);
+  if (!token) {
+    return reply.status(401).send({
+      detail: {
+        type: 'missing_token',
+        message: 'Authorization header with Bearer token is required',
+      },
+    });
+  }
 
-  if (!brainDump || brainDump.trim().length === 0) {
+  const { brain_dump, time_budget_min = 90 } = request.body;
+
+  if (!brain_dump || brain_dump.trim().length === 0) {
     return reply.status(400).send({
-      error: 'brainDump is required',
+      detail: {
+        type: 'missing_brain_dump',
+        message: 'brain_dump is required',
+      },
     });
   }
 
   try {
-    const result = await analyzeBrainDump(brainDump, timeBudgetMin);
-    return result;
+    const result = await analyzeBrainDump(brain_dump, time_budget_min);
+    
+    // Convert response to snake_case for frontend compatibility
+    return {
+      summary: result.summary,
+      top_actions: result.topActions.map(action => ({
+        id: action.id,
+        title: action.title,
+        reason: action.reason,
+        priority: action.priority,
+        estimate_min: action.estimateMin,
+        done: action.done,
+      })),
+      risks: result.risks,
+      time_budget_min: time_budget_min,
+      tag: {
+        space: result.tag.space,
+        career_signals: result.tag.careerSignals,
+        keywords: result.tag.keywords,
+        confidence: result.tag.confidence,
+      },
+    };
   } catch (error) {
     app.log.error(error);
     return reply.status(500).send({
-      error: 'Failed to analyze brain dump',
-      message: error instanceof Error ? error.message : 'Unknown error',
+      detail: {
+        type: 'analysis_error',
+        message: error instanceof Error ? error.message : 'Failed to analyze brain dump',
+      },
     });
   }
 });
