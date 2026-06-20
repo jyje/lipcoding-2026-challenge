@@ -1,38 +1,40 @@
-# Backend (FastAPI + uv) — single multi-stage Dockerfile, production target.
+# Backend (Node.js + Fastify) — TypeScript backend with Copilot SDK integration
 # Build context is the repository root (see .github/workflows/deploy.yml).
 
-# --- Stage 1: builder (resolve + install dependencies) ---
-FROM python:3.11-slim AS builder
-
-ENV UV_LINK_MODE=copy \
-    UV_COMPILE_BYTECODE=1 \
-    UV_PROJECT_ENVIRONMENT=/opt/venv
-
-RUN pip install --no-cache-dir uv
+# --- Stage 1: builder (compile TypeScript) ---
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies first for better layer caching.
-COPY backend/pyproject.toml backend/uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+# Install dependencies
+COPY backend/package*.json ./
+RUN npm ci
+
+# Copy source and build
+COPY backend/src ./src
+COPY backend/tsconfig.json ./
+RUN npm run build
 
 # --- Stage 2: runtime (slim production image) ---
-FROM python:3.11-slim AS runtime
+FROM node:20-alpine AS runtime
 
-ENV PATH="/opt/venv/bin:$PATH" \
-    PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
+ENV NODE_ENV=production \
     PORT=8010
 
 WORKDIR /app
 
-RUN adduser --disabled-password --gecos "" appuser
+RUN addgroup -S nodejs && adduser -S appuser -G nodejs
 
-COPY --from=builder /opt/venv /opt/venv
-COPY backend/app ./app
+# Copy built application and node_modules
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
 
+# Run as non-root user
 USER appuser
 
 EXPOSE 8010
 
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+# Set port for runtime and start
+CMD ["sh", "-c", "PORT=${PORT} node dist/index.js"]
+

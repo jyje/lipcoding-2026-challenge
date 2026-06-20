@@ -224,7 +224,7 @@ const start = async () => {
     console.log('👤 Registering user routes...');
     await registerUserRoutes(app);
 
-    const port = parseInt(process.env.PORT || '3001', 10);
+    const port = parseInt(process.env.PORT || '8010', 10);
     await app.listen({ port, host: '0.0.0.0' });
     console.log(`✅ Server listening on port ${port}`);
   } catch (err) {
