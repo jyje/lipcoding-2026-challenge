@@ -82,9 +82,55 @@ class AnalyzeAction(BaseModel):
     done: bool = False
 
 
+# ---------------------------------------------------------------------------
+# Agent chat domain
+# ---------------------------------------------------------------------------
+
+class TaskSnapshot(BaseModel):
+    """Minimal task representation sent by the frontend for agent context."""
+
+    id: str
+    title: str
+    status: str
+    priority: int
+    space: str
+    date: str
+
+
+class AgentChatRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
+    tasks: list[TaskSnapshot] = Field(default_factory=list, max_length=50)
+
+
+class AgentChange(BaseModel):
+    """A single mutation the AI wants to apply to a task."""
+
+    # "task_update" | "task_delete" | "reply_only"
+    type: str
+    # ID of the task to change; empty string means N/A
+    target_id: str = ""
+    # Which field to update (status / priority / space / title / date)
+    field: str = ""
+    # New value as a string; empty string means N/A
+    value: str = ""
+
+
+class AgentChatResponse(BaseModel):
+    reply: str
+    changes: list[AgentChange] = Field(default_factory=list)
+
+
+class AnalyzeTag(BaseModel):
+    space: Space
+    career_signals: list[str]
+    keywords: list[str]
+    confidence: float = Field(ge=0, le=1)
+
+
 class AnalyzeResponse(BaseModel):
     summary: str
     top_actions: list[AnalyzeAction]
     risks: list[str]
     time_budget_min: int
+    tag: AnalyzeTag
 

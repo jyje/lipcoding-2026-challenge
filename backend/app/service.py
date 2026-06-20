@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from app.analysis import HeuristicAnalyzer
+from app.analysis import AnalyzerProtocol
 from app.models import (
+    AgentChatRequest,
+    AgentChatResponse,
     AnalyzeRequest,
     AnalyzeResponse,
     GoalOverviewResponse,
@@ -18,9 +20,9 @@ from app.repository import TaskRepository
 
 
 class TaskService:
-    def __init__(self, repository: TaskRepository, analyzer: HeuristicAnalyzer | None = None) -> None:
+    def __init__(self, repository: TaskRepository, analyzer: AnalyzerProtocol) -> None:
         self._repository = repository
-        self._analyzer = analyzer or HeuristicAnalyzer()
+        self._analyzer = analyzer
         self._latest_insight: AnalyzeResponse | None = None
 
     async def create_task(self, space: Space, payload: TaskCreate) -> TaskRead:
@@ -64,4 +66,7 @@ class TaskService:
 
     async def latest_insight(self) -> AnalyzeResponse | None:
         return self._latest_insight
+
+    async def agent_chat(self, payload: AgentChatRequest) -> AgentChatResponse:
+        return self._analyzer.chat(payload)
 

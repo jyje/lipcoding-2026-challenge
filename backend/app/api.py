@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth import AuthContext, require_bearer_auth
 from app.models import (
+    AgentChatRequest,
+    AgentChatResponse,
     AnalyzeRequest,
     AnalyzeResponse,
     GoalOverviewResponse,
@@ -95,7 +97,16 @@ def build_router(get_service):
         service: TaskService = Depends(get_service),
         _auth: AuthContext = Depends(require_bearer_auth),
     ) -> AnalyzeResponse:
-        return await service.analyze(payload)
+        try:
+            return await service.analyze(payload)
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={
+                    "code": "ai_provider_error",
+                    "message": str(exc),
+                },
+            ) from exc
 
     @router.get(
         "/insights/latest",
@@ -110,6 +121,27 @@ def build_router(get_service):
         if result is None:
             raise HTTPException(status_code=404, detail="No insight found")
         return result
+
+    @router.post(
+        "/agent/chat",
+        response_model=AgentChatResponse,
+        summary="자연어 명령으로 업무 수정 / 질문 응답",
+    )
+    async def agent_chat(
+        payload: AgentChatRequest,
+        service: TaskService = Depends(get_service),
+        _auth: AuthContext = Depends(require_bearer_auth),
+    ) -> AgentChatResponse:
+        try:
+            return await service.agent_chat(payload)
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={
+                    "code": "ai_provider_error",
+                    "message": str(exc),
+                },
+            ) from exc
 
     return router
 

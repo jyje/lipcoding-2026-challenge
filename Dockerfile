@@ -1,20 +1,38 @@
-FROM node:18-alpine
+# Backend (FastAPI + uv) — single multi-stage Dockerfile, production target.
+# Build context is the repository root (see .github/workflows/deploy.yml).
+
+# --- Stage 1: builder (resolve + install dependencies) ---
+FROM python:3.11-slim AS builder
+
+ENV UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1 \
+    UV_PROJECT_ENVIRONMENT=/opt/venv
+
+RUN pip install --no-cache-dir uv
 
 WORKDIR /app
 
-COPY package*.json ./
-COPY backend/package*.json ./backend/
+# Install dependencies first for better layer caching.
+COPY backend/pyproject.toml backend/uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
 
-RUN npm ci --workspace=backend
+# --- Stage 2: runtime (slim production image) ---
+FROM python:3.11-slim AS runtime
 
-COPY backend/tsconfig.json ./backend/
-COPY backend/src ./backend/src
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PORT=8010
 
-RUN npm run build --workspace=backend
+WORKDIR /app
 
-EXPOSE 3001
+RUN adduser --disabled-password --gecos "" appuser
 
-ENV NODE_ENV=production
-ENV PORT=3001
+COPY --from=builder /opt/venv /opt/venv
+COPY backend/app ./app
 
-CMD ["npm", "start", "--workspace=backend"]
+USER appuser
+
+EXPOSE 8010
+
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]

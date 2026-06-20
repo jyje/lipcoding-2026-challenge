@@ -27,6 +27,17 @@ See `frontend-design.instructions.md` for comprehensive UI/UX design principles 
 4. **Motion**: Use animation purposefully, not excessively
 5. **Content**: Write copy as design material
 
+### Help / Explanatory Text Pattern
+
+Keep the visible UI concise. Do not render long instructional sentences inline.
+Instead, surface a short label (with a dotted underline) and/or a small "?" button,
+and reveal the detailed explanation in a tooltip on hover/focus.
+
+- Reuse the shared `HelpHint` component (see `frontend/pages/index.tsx`) for this.
+- The tooltip must be keyboard-accessible (`:focus-within`) and use `aria-label`/`role="tooltip"`.
+- Prefer one concise surface line; move the "how it works" detail into the hint.
+
+
 ## Frontend Stack
 
 - **Framework**: Next.js 14+

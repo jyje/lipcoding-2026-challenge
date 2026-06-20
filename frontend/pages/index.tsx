@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type GoalOverview = {
   goals: Array<{
@@ -17,6 +17,14 @@ type GoalOverview = {
 
 type TaskStatus = 'todo' | 'doing' | 'done';
 
+type TaskAiMeta = {
+  keywords: string[];
+  careerSignals: string[];
+  reason: string;
+  confidence: number;
+  analyzedAt: string;
+};
+
 type PlannerTask = {
   id: string;
   title: string;
@@ -25,6 +33,17 @@ type PlannerTask = {
   status: TaskStatus;
   priority: 1 | 2 | 3;
   space: 'work' | 'career' | 'tech';
+  aiMeta: TaskAiMeta;
+};
+
+type StoredPlannerTask = Partial<PlannerTask> & {
+  id?: string;
+  title?: string;
+  description?: string;
+  date?: string;
+  status?: string;
+  priority?: number;
+  space?: string;
 };
 
 type ChatMessage = {
@@ -42,10 +61,55 @@ type JobPosting = {
   url: string;
   status: JobStatus;
   addedDate: string;
+  location: string;
+  employmentType: string;
+  techStack: string[];
+  responsibilities: string[];
+  source: 'manual' | 'auto';
+};
+
+type StoredJobPosting = Partial<JobPosting> & {
+  id?: string;
+  title?: string;
+  company?: string;
+  url?: string;
+  status?: string;
+  addedDate?: string;
+};
+
+type AnalyzeApiResponse = {
+  summary: string;
+  top_actions: Array<{
+    id: string;
+    title: string;
+    reason: string;
+    priority: 1 | 2 | 3;
+    estimate_min: number;
+    done: boolean;
+  }>;
+  risks: string[];
+  time_budget_min: number;
+  tag: {
+    space: 'work' | 'career' | 'tech';
+    career_signals: string[];
+    keywords: string[];
+    confidence: number;
+  };
+};
+
+type AgentChatApiResponse = {
+  reply: string;
+  changes: Array<{
+    type: 'task_update' | 'task_delete' | 'reply_only';
+    target_id: string;
+    field: string;
+    value: string;
+  }>;
 };
 
 const STORAGE_KEYS = {
   name: 'thriveopsUserName',
+  apiToken: 'thriveopsApiToken',
   tasks: 'thriveopsTasks',
   jobs: 'thriveopsJobs',
 };
@@ -102,6 +166,77 @@ const relativeDateLabel = (dateKey: string, todayKey: string): string => {
   return '';
 };
 
+const buildPendingAiMeta = (reason = 'AI 분석 전 상태입니다.'): TaskAiMeta => ({
+  keywords: [],
+  careerSignals: ['분석대기'],
+  reason,
+  confidence: 0,
+  analyzedAt: new Date().toISOString(),
+});
+
+// 사용자 입력이 업무 등록이 아닌 "명령/질문"인지 판별한다.
+// 한국어 명령형 어미와 대표 액션 동사를 기준으로 분류한다.
+const COMMAND_REGEX =
+  /바꿔|변경해|수정해|올려줘|내려줘|삭제해|지워줘|해줘|해주세요|알려줘|뭐야\??|있어\??|없어\??|보여줘|조회해|언제야\??|완료로|doing으로|todo로|done으로|취소해|p[123]으로/i;
+
+const isCommandMessage = (text: string): boolean => COMMAND_REGEX.test(text.trim());
+
+const normalizePlannerTask = (raw: StoredPlannerTask, index: number, todayKey: string): PlannerTask => {
+  const safeStatus = ['todo', 'doing', 'done'].includes(String(raw.status))
+    ? (raw.status as TaskStatus)
+    : 'todo';
+  const safePriority = [1, 2, 3].includes(Number(raw.priority))
+    ? (Number(raw.priority) as 1 | 2 | 3)
+    : 2;
+  const baseTitle = raw.title?.trim() || '새 업무';
+  const baseDescription = raw.description?.trim() || baseTitle;
+
+  if (raw.aiMeta && Array.isArray(raw.aiMeta.careerSignals)) {
+    return {
+      id: raw.id ?? `task-migrated-${index}`,
+      title: baseTitle,
+      description: baseDescription,
+      date: raw.date?.trim() || todayKey,
+      status: safeStatus,
+      priority: safePriority,
+      space: ['work', 'career', 'tech'].includes(String(raw.space))
+        ? (raw.space as PlannerTask['space'])
+        : 'work',
+      aiMeta: {
+        keywords: Array.isArray(raw.aiMeta.keywords)
+          ? raw.aiMeta.keywords.filter((item): item is string => typeof item === 'string')
+          : [],
+        careerSignals: raw.aiMeta.careerSignals.filter((item): item is string => typeof item === 'string'),
+        reason:
+          typeof raw.aiMeta.reason === 'string' && raw.aiMeta.reason.trim().length > 0
+            ? raw.aiMeta.reason
+            : '기존 데이터에서 복원된 분석 결과입니다.',
+        confidence:
+          typeof raw.aiMeta.confidence === 'number' && raw.aiMeta.confidence > 0
+            ? raw.aiMeta.confidence
+            : 0,
+        analyzedAt:
+          typeof raw.aiMeta.analyzedAt === 'string' && raw.aiMeta.analyzedAt.trim().length > 0
+            ? raw.aiMeta.analyzedAt
+            : new Date().toISOString(),
+      },
+    };
+  }
+
+  return {
+    id: raw.id ?? `task-migrated-${index}`,
+    title: baseTitle,
+    description: baseDescription,
+    date: raw.date?.trim() || todayKey,
+    status: safeStatus,
+    priority: safePriority,
+    space: ['work', 'career', 'tech'].includes(String(raw.space))
+      ? (raw.space as PlannerTask['space'])
+      : 'work',
+    aiMeta: buildPendingAiMeta('기존 데이터로 복원되어 재분석 대기 중입니다.'),
+  };
+};
+
 const buildSeedTasks = (baseDate: Date): PlannerTask[] => [
   {
     id: 't-1',
@@ -111,6 +246,7 @@ const buildSeedTasks = (baseDate: Date): PlannerTask[] => [
     status: 'todo',
     priority: 1,
     space: 'work',
+    aiMeta: buildPendingAiMeta('시드 업무는 최초 저장 시 AI 재분석됩니다.'),
   },
   {
     id: 't-2',
@@ -120,6 +256,7 @@ const buildSeedTasks = (baseDate: Date): PlannerTask[] => [
     status: 'doing',
     priority: 2,
     space: 'tech',
+    aiMeta: buildPendingAiMeta('시드 업무는 최초 저장 시 AI 재분석됩니다.'),
   },
   {
     id: 't-3',
@@ -129,6 +266,7 @@ const buildSeedTasks = (baseDate: Date): PlannerTask[] => [
     status: 'todo',
     priority: 2,
     space: 'career',
+    aiMeta: buildPendingAiMeta('시드 업무는 최초 저장 시 AI 재분석됩니다.'),
   },
   {
     id: 't-4',
@@ -138,6 +276,7 @@ const buildSeedTasks = (baseDate: Date): PlannerTask[] => [
     status: 'done',
     priority: 3,
     space: 'work',
+    aiMeta: buildPendingAiMeta('시드 업무는 최초 저장 시 AI 재분석됩니다.'),
   },
   {
     id: 't-5',
@@ -147,6 +286,7 @@ const buildSeedTasks = (baseDate: Date): PlannerTask[] => [
     status: 'todo',
     priority: 1,
     space: 'career',
+    aiMeta: buildPendingAiMeta('시드 업무는 최초 저장 시 AI 재분석됩니다.'),
   },
   {
     id: 't-6',
@@ -156,6 +296,7 @@ const buildSeedTasks = (baseDate: Date): PlannerTask[] => [
     status: 'doing',
     priority: 1,
     space: 'work',
+    aiMeta: buildPendingAiMeta('시드 업무는 최초 저장 시 AI 재분석됩니다.'),
   },
 ];
 
@@ -178,8 +319,221 @@ const linkLabel = (url: string): string => {
   }
 };
 
+const autoCareerSeedBase = [
+  {
+    title: '프론트엔드 엔지니어 (React/Next.js)',
+    company: '브라이트랩',
+    location: '서울 강남구 · 하이브리드',
+    employmentType: '정규직',
+    techStack: ['TypeScript', 'React', 'Next.js', 'Tailwind CSS'],
+    responsibilities: [
+      '프로덕트 요구사항을 UI로 구현하고 성능을 개선합니다.',
+      '디자인 시스템 컴포넌트를 설계·유지보수합니다.',
+      '백엔드 API 연동 및 사용자 행동 지표를 분석합니다.',
+    ],
+  },
+  {
+    title: '백엔드 엔지니어 (Python/FastAPI)',
+    company: '데이터플로우',
+    location: '서울 성수 · 원격 일부 가능',
+    employmentType: '정규직',
+    techStack: ['Python', 'FastAPI', 'PostgreSQL', 'Docker'],
+    responsibilities: [
+      '도메인 API를 설계하고 운영 안정성을 높입니다.',
+      '데이터 모델링과 배치 파이프라인을 관리합니다.',
+      '모니터링 대시보드와 장애 대응 체계를 고도화합니다.',
+    ],
+  },
+  {
+    title: 'AI 서비스 기획자',
+    company: '스프린트AI',
+    location: '판교 · 하이브리드',
+    employmentType: '정규직',
+    techStack: ['LLM 제품 기획', 'SQL', 'A/B 테스트'],
+    responsibilities: [
+      'AI 기능 요구사항을 정의하고 릴리즈 우선순위를 관리합니다.',
+      '사용자 피드백과 데이터 기반으로 가설을 검증합니다.',
+      '개발·디자인·사업팀과 협업해 제품 성과를 개선합니다.',
+    ],
+  },
+  {
+    title: '프로덕트 디자이너 (B2B SaaS)',
+    company: '워크스케일',
+    location: '서울 을지로 · 오피스 중심',
+    employmentType: '정규직',
+    techStack: ['Figma', 'Design System', 'UX Research'],
+    responsibilities: [
+      '복잡한 업무 플로우를 정보구조 중심으로 재설계합니다.',
+      '디자인 시스템을 구축하고 컴포넌트 품질을 관리합니다.',
+      '정성·정량 리서치를 통해 사용성 개선안을 도출합니다.',
+    ],
+  },
+] as const;
+
+const buildAutoCareerJobs = (query: string, todayKey: string): JobPosting[] => {
+  const normalizedQuery = query.trim().toLowerCase();
+  const base = autoCareerSeedBase
+    .filter((item) => {
+      if (!normalizedQuery) {
+        return true;
+      }
+      const haystack = [
+        item.title,
+        item.company,
+        item.location,
+        item.employmentType,
+        ...item.techStack,
+        ...item.responsibilities,
+      ]
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(normalizedQuery);
+    })
+    .slice(0, 6);
+
+  const stamp = Date.now();
+  return base.map((item, index) => ({
+    id: `job-auto-${stamp}-${index}`,
+    title: item.title,
+    company: item.company,
+    url: '',
+    status: 'interest',
+    addedDate: todayKey,
+    location: item.location,
+    employmentType: item.employmentType,
+    techStack: [...item.techStack],
+    responsibilities: [...item.responsibilities],
+    source: 'auto',
+  }));
+};
+
+const normalizeJobPosting = (raw: StoredJobPosting, index: number, todayKey: string): JobPosting => {
+  const safeStatus = jobStatusOrder.includes(raw.status as JobStatus)
+    ? (raw.status as JobStatus)
+    : 'interest';
+  const techStack = Array.isArray(raw.techStack)
+    ? raw.techStack.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : [];
+  const responsibilities = Array.isArray(raw.responsibilities)
+    ? raw.responsibilities.filter(
+        (item): item is string => typeof item === 'string' && item.trim().length > 0,
+      )
+    : ['주요 담당업무는 공고 본문 확인'];
+
+  return {
+    id: raw.id ?? `job-migrated-${index}`,
+    title: raw.title?.trim() || '제목 미기재',
+    company: raw.company?.trim() || '',
+    url: raw.url?.trim() || '',
+    status: safeStatus,
+    addedDate: raw.addedDate?.trim() || todayKey,
+    location: raw.location?.trim() || '근무지 미기재',
+    employmentType: raw.employmentType?.trim() || '고용형태 미기재',
+    techStack,
+    responsibilities,
+    source: raw.source === 'auto' ? 'auto' : 'manual',
+  };
+};
+
+const mergeJobsByIdentity = (current: JobPosting[], incoming: JobPosting[]): JobPosting[] => {
+  const seen = new Set(current.map((job) => `${job.company}::${job.title}`.toLowerCase()));
+  const dedupedIncoming = incoming.filter((job) => {
+    const key = `${job.company}::${job.title}`.toLowerCase();
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+  return [...dedupedIncoming, ...current];
+};
+
+// 화면에는 간결하게, 자세한 설명은 도움말(?)을 통해 보여주는 재사용 컴포넌트.
+// 짧은 라벨(label)에는 점선 밑줄을, 우측 작은 "?" 버튼에는 호버/포커스 시
+// 상세 설명(text) 툴팁을 노출한다.
+function HelpHint({ label, text }: { label?: string; text: string }) {
+  return (
+    <span className="help-hint">
+      {label ? <span className="help-label">{label}</span> : null}
+      <button type="button" className="help-trigger" aria-label={label ? `${label} 설명` : '설명 보기'}>
+        ?
+      </button>
+      <span role="tooltip" className="help-tip">
+        {text}
+      </span>
+      <style jsx>{`
+        .help-hint {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          vertical-align: middle;
+        }
+        .help-label {
+          color: #6b7280;
+          border-bottom: 1px dotted #9ca3af;
+          cursor: help;
+        }
+        .help-trigger {
+          width: 18px;
+          height: 18px;
+          border-radius: 999px;
+          border: 1px solid #cbd5e1;
+          background: #f8fafc;
+          color: #475569;
+          font-size: 11px;
+          font-weight: 700;
+          line-height: 1;
+          padding: 0;
+          cursor: help;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .help-trigger:hover,
+        .help-trigger:focus-visible {
+          background: #e2e8f0;
+          color: #1e293b;
+          outline: none;
+        }
+        .help-tip {
+          position: absolute;
+          left: 0;
+          top: calc(100% + 8px);
+          z-index: 50;
+          width: max-content;
+          max-width: 280px;
+          background: #0f172a;
+          color: #f8fafc;
+          font-size: 12px;
+          font-weight: 400;
+          line-height: 1.5;
+          text-align: left;
+          white-space: normal;
+          padding: 8px 10px;
+          border-radius: 8px;
+          box-shadow: 0 8px 24px rgba(15, 23, 42, 0.25);
+          opacity: 0;
+          visibility: hidden;
+          transform: translateY(-2px);
+          transition: opacity 0.12s ease, transform 0.12s ease;
+          pointer-events: none;
+        }
+        .help-hint:hover .help-tip,
+        .help-hint:focus-within .help-tip {
+          opacity: 1;
+          visibility: visible;
+          transform: translateY(0);
+        }
+      `}</style>
+    </span>
+  );
+}
+
+
 export default function Home() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8010';
+  const defaultBearer = process.env.NEXT_PUBLIC_API_BEARER_TOKEN ?? 'dev-token';
   const todayKey = toDateKey(new Date());
   const [name, setName] = useState('');
   const [draftName, setDraftName] = useState('');
@@ -188,12 +542,16 @@ export default function Home() {
     {
       id: 'chat-1',
       role: 'assistant',
-      text: '업무·URL을 붙여넣거나 파일을 드롭하면 티켓으로 등록됩니다. 날짜는 카드의 파란 날짜를 클릭해 지정하세요.',
+      text: '여기에 업무를 입력하면 티켓으로 등록됩니다. 자세한 사용법은 위 “?”를 눌러 확인하세요.',
     },
   ]);
   const [messageDraft, setMessageDraft] = useState('');
+  const [apiToken, setApiToken] = useState(defaultBearer);
   const [jobs, setJobs] = useState<JobPosting[]>([]);
   const [jobDraft, setJobDraft] = useState('');
+  const [careerQuery, setCareerQuery] = useState('프론트엔드');
+  const [careerSearchLoading, setCareerSearchLoading] = useState(false);
+  const [careerNotice, setCareerNotice] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'work' | 'career'>('work');
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [editingDateId, setEditingDateId] = useState<string | null>(null);
@@ -205,18 +563,23 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<GoalOverview | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const careerSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const savedName = window.localStorage.getItem(STORAGE_KEYS.name);
     if (savedName) {
       setName(savedName);
     }
+    const savedApiToken = window.localStorage.getItem(STORAGE_KEYS.apiToken);
+    if (savedApiToken) {
+      setApiToken(savedApiToken);
+    }
     try {
       const savedTasks = window.localStorage.getItem(STORAGE_KEYS.tasks);
       if (savedTasks) {
-        const parsed = JSON.parse(savedTasks) as PlannerTask[];
+        const parsed = JSON.parse(savedTasks) as StoredPlannerTask[];
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setTasks(parsed);
+          setTasks(parsed.map((task, index) => normalizePlannerTask(task, index, todayKey)));
         }
       }
     } catch {
@@ -225,9 +588,9 @@ export default function Home() {
     try {
       const savedJobs = window.localStorage.getItem(STORAGE_KEYS.jobs);
       if (savedJobs) {
-        const parsedJobs = JSON.parse(savedJobs) as JobPosting[];
+        const parsedJobs = JSON.parse(savedJobs) as StoredJobPosting[];
         if (Array.isArray(parsedJobs)) {
-          setJobs(parsedJobs);
+          setJobs(parsedJobs.map((job, index) => normalizeJobPosting(job, index, todayKey)));
         }
       }
     } catch {
@@ -247,8 +610,40 @@ export default function Home() {
     if (!hydrated) {
       return;
     }
+    window.localStorage.setItem(STORAGE_KEYS.apiToken, apiToken);
+  }, [apiToken, hydrated]);
+
+  useEffect(() => {
+    setTasks((prev) => {
+      let changed = false;
+      const next = prev.map((task) => {
+        if (task.aiMeta && Array.isArray(task.aiMeta.careerSignals)) {
+          return task;
+        }
+        changed = true;
+        return {
+          ...task,
+          aiMeta: buildPendingAiMeta('레거시 데이터 감지: AI 재분석 대기 상태입니다.'),
+        };
+      });
+      return changed ? next : prev;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
     window.localStorage.setItem(STORAGE_KEYS.jobs, JSON.stringify(jobs));
   }, [jobs, hydrated]);
+
+  useEffect(() => {
+    return () => {
+      if (careerSearchTimerRef.current) {
+        clearTimeout(careerSearchTimerRef.current);
+      }
+    };
+  }, []);
 
   const tasksByStatus = useMemo(() => {
     const groups: Record<TaskStatus, PlannerTask[]> = { todo: [], doing: [], done: [] };
@@ -298,23 +693,156 @@ export default function Home() {
     };
   };
 
-  const createTickets = (entries: Array<{ title: string; description: string }>) => {
-    if (entries.length === 0) {
-      return;
+  const requestAiTag = async (text: string): Promise<AnalyzeApiResponse> => {
+    const token = apiToken.trim();
+    if (!token) {
+      throw new Error('API Bearer 토큰이 비어 있습니다. 우측 상단 토큰을 입력해 주세요.');
     }
+
+    const response = await fetch(`${apiUrl}/api/v1/analyze`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        brain_dump: text,
+        time_budget_min: 90,
+      }),
+    });
+
+    if (!response.ok) {
+      let detailMessage = `분석 요청 실패 (${response.status})`;
+      try {
+        const detail = await response.json();
+        const nested = detail?.detail?.message;
+        if (typeof nested === 'string' && nested.length > 0) {
+          detailMessage = nested;
+        }
+      } catch {
+        // no-op
+      }
+      throw new Error(detailMessage);
+    }
+
+    return (await response.json()) as AnalyzeApiResponse;
+  };
+
+  const requestAgentChat = async (message: string): Promise<AgentChatApiResponse> => {
+    const token = apiToken.trim();
+    if (!token) {
+      throw new Error('API Bearer 토큰이 비어 있습니다.');
+    }
+
+    const taskSnapshots = tasks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      status: t.status,
+      priority: t.priority,
+      space: t.space,
+      date: t.date,
+    }));
+
+    const response = await fetch(`${apiUrl}/api/v1/agent/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ message, tasks: taskSnapshots }),
+    });
+
+    if (!response.ok) {
+      let detailMessage = `에이전트 요청 실패 (${response.status})`;
+      try {
+        const detail = await response.json();
+        const nested = detail?.detail?.message;
+        if (typeof nested === 'string' && nested.length > 0) {
+          detailMessage = nested;
+        }
+      } catch {
+        // no-op
+      }
+      throw new Error(detailMessage);
+    }
+
+    return (await response.json()) as AgentChatApiResponse;
+  };
+
+  const applyAgentChanges = (changes: AgentChatApiResponse['changes']): number => {
+    if (!changes || changes.length === 0) {
+      return 0;
+    }
+
+    let mutationCount = 0;
+    setTasks((prev) => {
+      let next = [...prev];
+      for (const change of changes) {
+        if (change.type === 'task_delete' && change.target_id) {
+          next = next.filter((t) => t.id !== change.target_id);
+          mutationCount += 1;
+        } else if (change.type === 'task_update' && change.target_id && change.field && change.value) {
+          next = next.map((t) => {
+            if (t.id !== change.target_id) {
+              return t;
+            }
+            mutationCount += 1;
+            if (change.field === 'status') {
+              return { ...t, status: change.value as TaskStatus };
+            }
+            if (change.field === 'priority') {
+              return { ...t, priority: Number(change.value) as 1 | 2 | 3 };
+            }
+            if (change.field === 'space') {
+              return { ...t, space: change.value as PlannerTask['space'] };
+            }
+            if (change.field === 'title') {
+              return { ...t, title: change.value };
+            }
+            if (change.field === 'date') {
+              return { ...t, date: change.value };
+            }
+            return t;
+          });
+        }
+      }
+      return next;
+    });
+
+    return mutationCount;
+  };
+
+  const createTickets = async (entries: Array<{ title: string; description: string }>) => {
+    if (entries.length === 0) {
+      return 0;
+    }
+
     const stamp = Date.now();
-    setTasks((prev) => [
-      ...entries.map((entry, index) => ({
-        id: `task-${stamp}-${index}`,
-        title: entry.title,
-        description: entry.description,
-        date: todayKey,
-        status: 'todo' as TaskStatus,
-        priority: 2 as 1 | 2 | 3,
-        space: 'work' as const,
-      })),
-      ...prev,
-    ]);
+    const analyzed = await Promise.all(
+      entries.map(async (entry, index) => {
+        const ai = await requestAiTag(entry.description);
+        const topAction = ai.top_actions[0];
+        return {
+          id: `task-${stamp}-${index}`,
+          title: entry.title,
+          description: entry.description,
+          date: todayKey,
+          status: 'todo' as TaskStatus,
+          priority: topAction?.priority ?? 2,
+          space: ai.tag.space,
+          aiMeta: {
+            keywords: ai.tag.keywords,
+            careerSignals: ai.tag.career_signals,
+            reason: topAction?.reason || ai.summary,
+            confidence: ai.tag.confidence,
+            analyzedAt: new Date().toISOString(),
+          },
+        } as PlannerTask;
+      }),
+    );
+
+    setTasks((prev) => [...analyzed, ...prev]);
+    return analyzed.length;
   };
 
   const appendAssistant = (text: string) => {
@@ -328,18 +856,61 @@ export default function Home() {
     ]);
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     const text = messageDraft.trim();
     if (!text) {
       return;
     }
 
+    // 명령/질문 → 에이전트 대화 라우팅
+    if (isCommandMessage(text) && text.split('\n').filter(Boolean).length === 1) {
+      setMessageDraft('');
+      setChatMessages((prev) => [
+        ...prev,
+        { id: `chat-${Date.now()}`, role: 'user', text },
+        { id: `chat-${Date.now()}-thinking`, role: 'assistant', text: 'AI가 처리 중입니다…' },
+      ]);
+      try {
+        const result = await requestAgentChat(text);
+        const mutated = applyAgentChanges(result.changes);
+        const suffix = mutated > 0 ? ` (${mutated}건 반영됨)` : '';
+        setChatMessages((prev) => {
+          const withoutThinking = prev.filter((m) => !m.id.endsWith('-thinking'));
+          return [
+            ...withoutThinking,
+            { id: `chat-${Date.now()}-reply`, role: 'assistant', text: result.reply + suffix },
+          ];
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'AI 처리 중 오류가 발생했습니다.';
+        setChatMessages((prev) => {
+          const withoutThinking = prev.filter((m) => !m.id.endsWith('-thinking'));
+          return [
+            ...withoutThinking,
+            { id: `chat-${Date.now()}-error`, role: 'assistant', text: `처리 실패: ${message}` },
+          ];
+        });
+      }
+      return;
+    }
+
+    // 일반 텍스트 → 티켓 등록
     const lines = text
       .split('\n')
       .map((line) => line.trim())
       .filter(Boolean);
     const entries = lines.map(buildTicketEntry);
-    createTickets(entries);
+    try {
+      await createTickets(entries);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'AI 분석 요청 중 오류가 발생했습니다.';
+      setChatMessages((prev) => [
+        ...prev,
+        { id: `chat-${Date.now()}`, role: 'user', text },
+        { id: `chat-${Date.now()}-error`, role: 'assistant', text: `등록 실패: ${message}` },
+      ]);
+      return;
+    }
     setMessageDraft('');
     setChatMessages((prev) => [
       ...prev,
@@ -355,7 +926,7 @@ export default function Home() {
     ]);
   };
 
-  const handleDropTickets = (event: React.DragEvent) => {
+  const handleDropTickets = async (event: React.DragEvent) => {
     event.preventDefault();
     setDropActive(false);
     const files = Array.from(event.dataTransfer.files);
@@ -380,8 +951,13 @@ export default function Home() {
     if (entries.length === 0) {
       return;
     }
-    createTickets(entries);
-    appendAssistant(`드롭한 ${entries.length}개 항목을 티켓으로 등록했습니다.`);
+    try {
+      await createTickets(entries);
+      appendAssistant(`드롭한 ${entries.length}개 항목을 티켓으로 등록했습니다.`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'AI 분석 요청 중 오류가 발생했습니다.';
+      appendAssistant(`등록 실패: ${message}`);
+    }
   };
 
   const moveTaskStatus = (taskId: string, nextStatus: TaskStatus) => {
@@ -424,14 +1000,35 @@ export default function Home() {
     setTaskDraft(null);
   };
 
-  const saveTaskDraft = () => {
+  const saveTaskDraft = async () => {
     if (!taskDraft) {
       return;
     }
     const title = taskDraft.title.trim() || '제목 없음';
-    setTasks((prev) =>
-      prev.map((task) => (task.id === taskDraft.id ? { ...taskDraft, title } : task)),
-    );
+    try {
+      const ai = await requestAiTag(taskDraft.description || title);
+      const topAction = ai.top_actions[0];
+      const rebuiltTask: PlannerTask = {
+        ...taskDraft,
+        title,
+        priority: topAction?.priority ?? taskDraft.priority,
+        space: ai.tag.space,
+        aiMeta: {
+          keywords: ai.tag.keywords,
+          careerSignals: ai.tag.career_signals,
+          reason: topAction?.reason || ai.summary,
+          confidence: ai.tag.confidence,
+          analyzedAt: new Date().toISOString(),
+        },
+      };
+      setTasks((prev) =>
+        prev.map((task) => (task.id === taskDraft.id ? rebuiltTask : task)),
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'AI 재분석에 실패했습니다.';
+      setError(message);
+      return;
+    }
     closeTaskEditor();
   };
 
@@ -478,6 +1075,11 @@ export default function Home() {
           url,
           status: 'interest' as JobStatus,
           addedDate: todayKey,
+          location: '근무지 미기재',
+          employmentType: '고용형태 미기재',
+          techStack: [],
+          responsibilities: ['주요 담당업무는 공고 본문 확인'],
+          source: 'manual' as const,
         };
       });
     if (entries.length === 0) {
@@ -485,6 +1087,42 @@ export default function Home() {
     }
     setJobs((prev) => [...entries, ...prev]);
     setJobDraft('');
+    setCareerNotice(`수동으로 ${entries.length}건을 추가했습니다.`);
+  };
+
+  const startAutoCareerSearch = () => {
+    if (careerSearchLoading) {
+      return;
+    }
+    const query = careerQuery.trim();
+    setCareerNotice(null);
+    setCareerSearchLoading(true);
+    if (careerSearchTimerRef.current) {
+      clearTimeout(careerSearchTimerRef.current);
+      careerSearchTimerRef.current = null;
+    }
+    careerSearchTimerRef.current = setTimeout(() => {
+      const searched = buildAutoCareerJobs(query, todayKey);
+      setJobs((prev) => mergeJobsByIdentity(prev, searched));
+      setCareerSearchLoading(false);
+      if (searched.length === 0) {
+        setCareerNotice('검색 결과가 없습니다. 키워드를 바꿔 다시 시도해 주세요.');
+        return;
+      }
+      setCareerNotice(`자동 검색으로 ${searched.length}건을 가져왔습니다.`);
+      careerSearchTimerRef.current = null;
+    }, 700);
+  };
+
+  const cancelAutoCareerSearch = () => {
+    if (careerSearchTimerRef.current) {
+      clearTimeout(careerSearchTimerRef.current);
+      careerSearchTimerRef.current = null;
+    }
+    if (careerSearchLoading) {
+      setCareerSearchLoading(false);
+      setCareerNotice('자동 검색을 취소했습니다.');
+    }
   };
 
   const setJobStatus = (jobId: string, status: JobStatus) => {
@@ -546,8 +1184,8 @@ export default function Home() {
                   ThriveOps
                 </div>
                 <h1 className="heroTitle" style={{ fontSize: '40px', lineHeight: 1.1, margin: 0 }}>
-                  <span className="heroFull">업무가 곧 커리어가 되는 실행 워크스페이스</span>
-                  <span className="heroShort">워크스페이스</span>
+                  <span className="heroFull">업무와 채용 트렌드를 연결하는 실행 워크스페이스</span>
+                  <span className="heroShort">채용 트렌드 워크스페이스</span>
                 </h1>
                 <style jsx>{`
                   .heroShort {
@@ -563,12 +1201,24 @@ export default function Home() {
                   }
                 `}</style>
                 <p style={{ margin: '10px 0 0', color: '#4b5563' }}>
-                  업무·커리어·테크 지식을 한곳에 모아, 매일의 실행으로 업무 생산성과 개인의 커리어 성장을 함께 챙깁니다.
+                  매일의 업무를 채용 수요와 연결해, 업무 생산성과 커리어 성장 방향을 함께 선명하게 만듭니다.
                 </p>
               </div>
 
               {name ? (
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <input
+                    value={apiToken}
+                    onChange={(event) => setApiToken(event.target.value)}
+                    placeholder="API Bearer 토큰"
+                    style={{
+                      width: '220px',
+                      padding: '10px 12px',
+                      borderRadius: '10px',
+                      border: '1px solid #d1d5db',
+                      fontSize: '12px',
+                    }}
+                  />
                   <button
                     onClick={() => setShowIntent(true)}
                     style={{
@@ -616,6 +1266,7 @@ export default function Home() {
                 { key: 'career', label: '커리어' },
               ] as const).map((tab) => {
                 const isActive = activeTab === tab.key;
+                const count = tab.key === 'work' ? tasks.length : jobs.length;
                 return (
                   <button
                     key={tab.key}
@@ -632,7 +1283,7 @@ export default function Home() {
                     }}
                   >
                     {tab.label}
-                    {tab.key === 'career' && jobs.length > 0 ? ` · ${jobs.length}` : ''}
+                    {` · ${count}`}
                   </button>
                 );
               })}
@@ -660,8 +1311,11 @@ export default function Home() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
                   <div>
                     <h2 style={{ margin: '0 0 8px', fontSize: '26px' }}>업무</h2>
-                    <p style={{ margin: 0, color: '#6b7280' }}>
-                      카드는 상태 칸으로 드래그하고, 파란 날짜를 클릭하면 일정을 바꿀 수 있습니다.
+                    <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>
+                      <HelpHint
+                        label="사용법"
+                        text="카드는 상태 칸으로 드래그하고, 파란 날짜를 클릭하면 일정을 바꿀 수 있습니다."
+                      />
                     </p>
                   </div>
 
@@ -731,6 +1385,8 @@ export default function Home() {
                         {tasksByStatus[statusKey].map((task) => {
                           const relative = relativeDateLabel(task.date, todayKey);
                           const isOverdue = task.date < todayKey && task.status !== 'done';
+                          const aiSignals = task.aiMeta?.careerSignals ?? ['문제해결'];
+                          const aiConfidence = task.aiMeta?.confidence ?? 0.6;
                           return (
                             <article
                               key={task.id}
@@ -829,6 +1485,36 @@ export default function Home() {
                                 )}
                                 <span style={{ fontSize: '11px', color: '#9ca3af' }}>
                                   {task.space.toUpperCase()}
+                                </span>
+                              </div>
+                              <div
+                                style={{
+                                  marginTop: '8px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '8px',
+                                  flexWrap: 'wrap',
+                                }}
+                              >
+                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                  {aiSignals.slice(0, 2).map((signal) => (
+                                    <span
+                                      key={`${task.id}-${signal}`}
+                                      style={{
+                                        fontSize: '11px',
+                                        color: '#4338ca',
+                                        background: '#eef2ff',
+                                        borderRadius: '999px',
+                                        padding: '2px 8px',
+                                      }}
+                                    >
+                                      {signal}
+                                    </span>
+                                  ))}
+                                </div>
+                                <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                                  AI {Math.round(aiConfidence * 100)}%
                                 </span>
                               </div>
                             </article>
@@ -961,9 +1647,11 @@ export default function Home() {
                 >
                   <div>
                     <h2 style={{ margin: '0 0 8px', fontSize: '26px' }}>커리어</h2>
-                    <p style={{ margin: 0, color: '#6b7280' }}>
-                      관심 채용공고를 업무와 분리해 별도로 관리합니다. 링크나 “회사 - 직무”를 붙여넣어
-                      직접 수집하세요.
+                    <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>
+                      <HelpHint
+                        label="사용법"
+                        text="관심 채용공고를 업무와 분리해 별도로 관리합니다. 링크나 “회사 - 직무”를 붙여넣어 직접 수집하세요."
+                      />
                     </p>
                   </div>
                   <div
@@ -985,7 +1673,7 @@ export default function Home() {
                   style={{
                     marginTop: '16px',
                     display: 'grid',
-                    gridTemplateColumns: '1fr auto',
+                    gridTemplateColumns: 'minmax(0, 1fr) auto',
                     gap: '10px',
                     alignItems: 'center',
                   }}
@@ -1027,10 +1715,82 @@ export default function Home() {
                     수집
                   </button>
                 </div>
+
+                <div
+                  style={{
+                    marginTop: '10px',
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(0, 1fr) auto auto',
+                    gap: '8px',
+                    alignItems: 'center',
+                  }}
+                >
+                  <input
+                    type="text"
+                    value={careerQuery}
+                    onChange={(event) => setCareerQuery(event.target.value)}
+                    placeholder="자동 검색 키워드 (예: 프론트엔드, 백엔드, 디자이너)"
+                    style={{
+                      width: '100%',
+                      borderRadius: '10px',
+                      border: '1px solid #d1d5db',
+                      padding: '10px 12px',
+                      fontSize: '13px',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={startAutoCareerSearch}
+                    disabled={careerSearchLoading}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: '10px',
+                      border: '1px solid #c7d2fe',
+                      background: '#eef2ff',
+                      color: '#4338ca',
+                      fontWeight: 700,
+                      cursor: careerSearchLoading ? 'default' : 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {careerSearchLoading ? '검색 중...' : '자동 검색'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelAutoCareerSearch}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: '10px',
+                      border: '1px solid #d1d5db',
+                      background: '#fff',
+                      color: '#374151',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    취소
+                  </button>
+                </div>
                 <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#9ca3af' }}>
-                  정기 자동 수집은 외부 사이트 크롤링이 필요해 백엔드 연동 시 지원됩니다. 현재는 수동
-                  수집을 제공합니다.
+                  현재는 목데이터 기반 자동 검색이지만, 채용 트렌드와 실제 채용 수요를 반영하는
+                  방향으로 설계했습니다. 검색/수집 결과는 새로고침 후에도 유지됩니다.
                 </p>
+                {careerNotice ? (
+                  <div
+                    style={{
+                      marginTop: '8px',
+                      fontSize: '12px',
+                      color: '#334155',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '10px',
+                      padding: '8px 10px',
+                    }}
+                  >
+                    {careerNotice}
+                  </div>
+                ) : null}
 
                 {jobs.length > 0 ? (
                   <div
@@ -1087,6 +1847,72 @@ export default function Home() {
                           {job.company ? (
                             <div style={{ fontSize: '12px', color: '#6b7280' }}>{job.company}</div>
                           ) : null}
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            <span
+                              style={{
+                                fontSize: '11px',
+                                color: '#475569',
+                                background: '#f1f5f9',
+                                borderRadius: '999px',
+                                padding: '3px 8px',
+                              }}
+                            >
+                              {job.location}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: '11px',
+                                color: '#475569',
+                                background: '#f1f5f9',
+                                borderRadius: '999px',
+                                padding: '3px 8px',
+                              }}
+                            >
+                              {job.employmentType}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: '11px',
+                                color: job.source === 'auto' ? '#4338ca' : '#166534',
+                                background: job.source === 'auto' ? '#eef2ff' : '#ecfdf5',
+                                borderRadius: '999px',
+                                padding: '3px 8px',
+                              }}
+                            >
+                              {job.source === 'auto' ? '자동 검색' : '수동 수집'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'grid', gap: '6px' }}>
+                            <div style={{ fontSize: '12px', color: '#6b7280' }}>기술 스택</div>
+                            {job.techStack.length > 0 ? (
+                              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                {job.techStack.map((stack) => (
+                                  <span
+                                    key={`${job.id}-${stack}`}
+                                    style={{
+                                      fontSize: '11px',
+                                      color: '#1d4ed8',
+                                      background: '#eff6ff',
+                                      borderRadius: '999px',
+                                      padding: '3px 8px',
+                                    }}
+                                  >
+                                    {stack}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <div style={{ fontSize: '12px', color: '#9ca3af' }}>기술 스택 미기재</div>
+                            )}
+                          </div>
+                          <div style={{ display: 'grid', gap: '6px' }}>
+                            <div style={{ fontSize: '12px', color: '#6b7280' }}>주요 담당업무</div>
+                            <ul style={{ margin: 0, paddingLeft: '16px', color: '#475569', fontSize: '12px' }}>
+                              {job.responsibilities.slice(0, 2).map((item) => (
+                                <li key={`${job.id}-${item}`}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
                           {job.url ? (
                             <a
                               href={job.url}
@@ -1207,8 +2033,18 @@ export default function Home() {
                   >
                     대화창
                   </span>
-                  <h3 style={{ margin: '4px 0 0', fontSize: '18px', color: '#fff' }}>
+                  <h3
+                    style={{
+                      margin: '4px 0 0',
+                      fontSize: '18px',
+                      color: '#fff',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
                     하단 고정 · 티켓 입력함
+                    <HelpHint text="업무·URL을 붙여넣거나 파일을 드롭하면 티켓으로 등록됩니다. 날짜는 카드의 파란 날짜를 클릭해 지정하세요." />
                   </h3>
                 </div>
               </div>

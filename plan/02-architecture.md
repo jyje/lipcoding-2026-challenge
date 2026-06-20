@@ -94,6 +94,49 @@ flowchart LR
 - `matchedSkills: string[]` (채용 공고 역량과 매칭)
 - `ranAt: string`
 
+### UserProfile (사용자 컨텍스트)
+
+- `id: string`
+- `name: string` (로그인 기준 식별자)
+- `createdAt: string`
+- `updatedAt: string`
+
+### ConversationSession (대화 세션)
+
+- `id: string`
+- `userId: string`
+- `title: string`
+- `startedAt: string`
+- `updatedAt: string`
+
+### ConversationTurn (대화 턴)
+
+- `id: string`
+- `sessionId: string`
+- `role: "user" | "assistant"`
+- `message: string`
+- `intent: "add" | "update" | "delete" | "insight" | "query"`
+- `createdAt: string`
+
+### InsightNote (대화 기반 인사이트)
+
+- `id: string`
+- `userId: string`
+- `summary: string`
+- `evidence: string[]` (업무/커리어 데이터 근거)
+- `recommendedActions: string[]`
+- `createdAt: string`
+
+### ActivityEvent (추적 로그)
+
+- `id: string`
+- `userId: string`
+- `sessionId?: string`
+- `eventType: "task_changed" | "job_changed" | "insight_added"`
+- `targetId: string`
+- `payload: object`
+- `createdAt: string`
+
 ## 4) API 계약 (MVP)
 
 ### POST /api/analyze
@@ -166,11 +209,52 @@ flowchart LR
 - 역량 분석 → 문제 해결 → 지식 축적 과정을 1회 실행하고 `LearningCycle` 기록 반환
 - 반복 실행 시 지식기반과 커리어 역량 매칭이 함께 누적됨
 
+### POST /api/agent/chat
+
+- 사용자 대화 입력을 받아 intent 추론 후 업무/커리어/인사이트를 갱신
+- 응답: `reply`, `appliedChanges[]`, `insight?`, `updatedContext`
+
+요청 예시
+
+```json
+{
+  "name": "지예",
+  "message": "이번 주 채용공고 중 프론트엔드만 추려서 인사이트 추가해줘"
+}
+```
+
+응답 예시
+
+```json
+{
+  "reply": "프론트엔드 공고 3건을 기준으로 인사이트를 추가했습니다.",
+  "appliedChanges": [
+    { "type": "job_filter", "count": 3 },
+    { "type": "insight_added", "id": "insight-1" }
+  ],
+  "insight": {
+    "id": "insight-1",
+    "summary": "React/TypeScript 요구 비중이 높습니다.",
+    "evidence": ["job-1", "job-3", "job-5"],
+    "recommendedActions": ["다음 주 UI 성능 개선 사례 정리"]
+  }
+}
+```
+
+### GET /api/agent/context?name={name}
+
+- 이름 기준 사용자 컨텍스트(최근 업무/커리어/인사이트/대화 요약) 반환
+
+### GET /api/events?name={name}
+
+- 대화로 인해 발생한 데이터 변경 이력 조회
+
 ## 5) AI 출력 강제 전략
 
 - Zod 또는 JSON schema로 구조화 응답 강제
 - 1회 재시도 후 실패 시 fallback
 - fallback: 원문 기반 기본 액션 1~3개 생성
+- 대화형 명령은 intent + target + patch 형태의 구조화 JSON으로 제한
 
 ## 6) 보안/운영
 

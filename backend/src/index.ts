@@ -2,6 +2,8 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { initializeDatabase } from './database';
 import { registerUserRoutes } from './routes/user';
+import { analyzeBrainDump } from './services/analyzeService';
+import 'dotenv/config';
 
 const app = Fastify({ logger: true });
 
@@ -27,23 +29,16 @@ app.post<{
     });
   }
 
-  // TODO: Implement Copilot Extensions SDK integration
-  // For now, return mock response
-  return {
-    summary: 'Analysis placeholder',
-    topActions: [
-      {
-        id: 'a1',
-        title: 'Action 1',
-        reason: 'High priority',
-        priority: 1 as const,
-        estimateMin: 30,
-        done: false,
-      },
-    ],
-    planBlocks: [],
-    risks: [],
-  };
+  try {
+    const result = await analyzeBrainDump(brainDump, timeBudgetMin);
+    return result;
+  } catch (error) {
+    app.log.error(error);
+    return reply.status(500).send({
+      error: 'Failed to analyze brain dump',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 });
 
 // Actions list endpoint
@@ -66,17 +61,38 @@ app.patch<{
 app.post<{
   Body: {
     remainingMin: number;
+    currentBrainDump?: string;
   };
 }>('/api/replan', async (request, reply) => {
-  const { remainingMin } = request.body;
+  const { remainingMin, currentBrainDump } = request.body;
 
-  // TODO: Implement replan logic
-  return {
-    summary: 'Updated plan based on remaining time',
-    topActions: [],
-    planBlocks: [],
-    risks: [],
-  };
+  if (remainingMin < 0) {
+    return reply.status(400).send({
+      error: 'remainingMin must be >= 0',
+    });
+  }
+
+  try {
+    // If brain dump provided, re-analyze with new time budget
+    if (currentBrainDump) {
+      const result = await analyzeBrainDump(currentBrainDump, remainingMin);
+      return result;
+    }
+
+    // Otherwise return placeholder for updating existing analysis
+    return {
+      summary: 'Plan updated based on remaining time',
+      topActions: [],
+      planBlocks: [],
+      risks: [],
+    };
+  } catch (error) {
+    app.log.error(error);
+    return reply.status(500).send({
+      error: 'Failed to replan',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 });
 
 const start = async () => {

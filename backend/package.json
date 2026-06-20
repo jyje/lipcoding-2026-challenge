@@ -14,7 +14,9 @@
     "fastify": "^4.25.0",
     "@fastify/cors": "^9.0.0",
     "zod": "^3.22.0",
-    "sqlite3": "^5.1.6"
+    "sqlite3": "^5.1.6",
+    "@copilot-extensions/preview-sdk": "^5.0.1",
+    "dotenv": "^16.3.1"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

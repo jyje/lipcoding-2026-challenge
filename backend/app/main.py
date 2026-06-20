@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.analysis import HeuristicAnalyzer
+from app.analysis import OpenAIAnalyzer
 from app.api import build_router
 from app.repository import InMemoryTaskRepository
 from app.service import TaskService
@@ -32,7 +32,7 @@ def create_app() -> FastAPI:
     )
 
     repository = InMemoryTaskRepository()
-    service = TaskService(repository, analyzer=HeuristicAnalyzer())
+    service = TaskService(repository, analyzer=OpenAIAnalyzer())
 
     def get_service() -> TaskService:
         return service

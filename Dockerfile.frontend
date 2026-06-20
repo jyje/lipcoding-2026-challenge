@@ -1,22 +1,42 @@
-FROM node:18-alpine
+# Frontend (Next.js) — multi-stage Dockerfile with development and production
+# targets. Build context is the repository root.
+#   - production (default): docker build -f Dockerfile.frontend .
+#   - development:          docker build -f Dockerfile.frontend --target dev .
 
+# --- Stage: deps (install node_modules once) ---
+FROM node:20-alpine AS deps
 WORKDIR /app
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm ci
 
-COPY package*.json ./
-COPY frontend/package*.json ./frontend/
-
-RUN npm ci --workspace=frontend
-
-COPY frontend/next.config.js ./frontend/
-COPY frontend/tsconfig.json ./frontend/
-COPY frontend/pages ./frontend/pages
-COPY frontend/components ./frontend/components 2>/dev/null || true
-
-RUN npm run build --workspace=frontend
-
+# --- Stage: dev (hot-reload development server) ---
+FROM node:20-alpine AS dev
+WORKDIR /app
+ENV NODE_ENV=development \
+    NEXT_TELEMETRY_DISABLED=1
+COPY --from=deps /app/node_modules ./node_modules
+COPY frontend/ ./
 EXPOSE 3000
+CMD ["npm", "run", "dev"]
 
-ENV NODE_ENV=production
-ENV NEXT_PUBLIC_API_URL=/api
+# --- Stage: builder (produce standalone production build) ---
+FROM node:20-alpine AS builder
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+COPY --from=deps /app/node_modules ./node_modules
+COPY frontend/ ./
+RUN mkdir -p public && npm run build
 
-CMD ["npm", "start", "--workspace=frontend"]
+# --- Stage: prod (minimal production runner) ---
+FROM node:20-alpine AS prod
+WORKDIR /app
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000
+RUN addgroup -S nodejs && adduser -S nextjs -G nodejs
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+USER nextjs
+EXPOSE 3000
+CMD ["node", "server.js"]
