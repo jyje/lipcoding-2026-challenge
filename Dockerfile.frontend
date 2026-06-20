@@ -1,0 +1,22 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+COPY frontend/package*.json ./frontend/
+
+RUN npm ci --workspace=frontend
+
+COPY frontend/next.config.js ./frontend/
+COPY frontend/tsconfig.json ./frontend/
+COPY frontend/pages ./frontend/pages
+COPY frontend/components ./frontend/components 2>/dev/null || true
+
+RUN npm run build --workspace=frontend
+
+EXPOSE 3000
+
+ENV NODE_ENV=production
+ENV NEXT_PUBLIC_API_URL=/api
+
+CMD ["npm", "start", "--workspace=frontend"]

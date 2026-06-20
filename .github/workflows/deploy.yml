@@ -1,0 +1,76 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  REGISTRY: ${{ secrets.AZURE_REGISTRY_URL }}
+  BACKEND_IMAGE_NAME: lifeos-backend
+  FRONTEND_IMAGE_NAME: lifeos-frontend
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Azure Container Registry
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ env.REGISTRY }}
+          username: ${{ secrets.AZURE_REGISTRY_USERNAME }}
+          password: ${{ secrets.AZURE_REGISTRY_PASSWORD }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.frontend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Deploy to Azure Container Apps
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          acrName: ${{ secrets.AZURE_REGISTRY_NAME }}
+          acrUsername: ${{ secrets.AZURE_REGISTRY_USERNAME }}
+          acrPassword: ${{ secrets.AZURE_REGISTRY_PASSWORD }}
+          imageToDeploy: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:${{ github.sha }}
+          resourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          containerAppName: lifeos-backend
+          containerAppEnvironment: ${{ secrets.AZURE_CONTAINER_APP_ENV }}
+          targetPort: 3001
+
+      - name: Health Check
+        run: |
+          BACKEND_URL=${{ secrets.AZURE_BACKEND_URL }}/health
+          echo "Checking health at: $BACKEND_URL"
+          for i in {1..30}; do
+            if curl -f $BACKEND_URL; then
+              echo "Health check passed"
+              exit 0
+            fi
+            echo "Attempt $i/30 failed, retrying..."
+            sleep 10
+          done
+          echo "Health check failed after 30 attempts"
+          exit 1

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "skills": {
+    "copilot-sdk": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/copilot-sdk/SKILL.md",
+      "computedHash": "16beed1bc9cddb25e0b0af8afedbdac70ba90debaa9d490fa9921e3eddce020e"
+    },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "4eabc66183767153e404b39d1b839b1c37f2d82d86f0a0d7e880a579d8d62336"
+    },
+    "mcp-copilot-studio-server-generator": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/mcp-copilot-studio-server-generator/SKILL.md",
+      "computedHash": "290b35da40b5a6485cd8b83ab0ce615a2bb2e3aaae78a09484349815c8b0b371"
+    },
+    "persistent-wiki-agent": {
+      "source": "/Users/jyje/.copilot/session-state/178427ca-8bad-4107-8bc0-7dea380c7a67/files/persistent-wiki-skill",
+      "sourceType": "local",
+      "computedHash": "15936bb38eab6c5762276b46cb6becedab403e60099a995a7837a1caabd867ba"
+    }
+  }
+}
