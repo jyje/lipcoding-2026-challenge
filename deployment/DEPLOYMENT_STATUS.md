@@ -110,8 +110,8 @@ copilot /autopilot --task "deploy to azure"
     ┌────────────────────────┐
     │ Azure Container        │
     │ Registry (ACR)         │
-    │ (lifeos-backend:latest)│
-    │ (lifeos-frontend:...) │
+    │ (thriveops-backend:latest)│
+    │ (thriveops-frontend:...) │
     └────────┬───────────────┘
              │
              ▼

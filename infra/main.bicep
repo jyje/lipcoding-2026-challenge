@@ -1,8 +1,8 @@
 param location string = 'eastus'
-param resourceGroupName string = 'lifeos-rg'
-param containerAppEnvName string = 'lifeos-env'
-param backendContainerAppName string = 'lifeos-backend'
-param frontendContainerAppName string = 'lifeos-frontend'
+param resourceGroupName string = 'thriveops-rg'
+param containerAppEnvName string = 'thriveops-env'
+param backendContainerAppName string = 'thriveops-backend'
+param frontendContainerAppName string = 'thriveops-frontend'
 param acrLoginServer string
 param backendImageName string
 param frontendImageName string

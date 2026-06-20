@@ -112,8 +112,8 @@ copilot /delegate
 ./scripts/deploy.sh
 
 # Manual Container Apps deployment
-az containerapp create --name lifeos-backend ...
-az containerapp create --name lifeos-frontend ...
+az containerapp create --name thriveops-backend ...
+az containerapp create --name thriveops-frontend ...
 ```
 
 **Advantages**:
@@ -148,13 +148,13 @@ After deployment, verify with:
 
 ```bash
 # Check backend health
-curl https://lifeos-backend.<region>.azurecontainerapps.io/health
+curl https://thriveops-backend.<region>.azurecontainerapps.io/health
 
 # Check frontend accessibility
-curl https://lifeos-frontend.<region>.azurecontainerapps.io
+curl https://thriveops-frontend.<region>.azurecontainerapps.io
 
 # View logs
-az containerapp logs show --name lifeos-backend --resource-group lifeos-rg
+az containerapp logs show --name thriveops-backend --resource-group thriveops-rg
 ```
 
 ## ⚠️ Troubleshooting

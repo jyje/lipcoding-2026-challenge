@@ -136,7 +136,7 @@ git push origin main
 copilot /delegate
 
 # Option B: 자동 배포
-copilot /autopilot --task "deploy lifeos to azure"
+copilot /autopilot --task "deploy thriveops to azure"
 
 # AI 에이전트가:
 # 1. Azure 리소스 생성
@@ -165,9 +165,9 @@ chmod +x scripts/deploy.sh
 
 # Step 3: 수동으로 Container Apps 배포 (선택)
 az containerapp create \
-  --name lifeos-backend \
-  --resource-group lifeos-rg \
-  --image <registry-url>/lifeos-backend:latest \
+  --name thriveops-backend \
+  --resource-group thriveops-rg \
+  --image <registry-url>/thriveops-backend:latest \
   --target-port 3001
 ```
 
@@ -220,8 +220,8 @@ NEXT_PUBLIC_API_URL=https://<backend-azure-url>
 ┌─────────────────────────┐
 │ Azure Container         │
 │ Registry (ACR)          │
-│ (lifeos-backend:latest) │
-│ (lifeos-frontend:latest)│
+│ (thriveops-backend:latest) │
+│ (thriveops-frontend:latest)│
 └────────────┬────────────┘
              │
              ▼
@@ -245,15 +245,15 @@ NEXT_PUBLIC_API_URL=https://<backend-azure-url>
 
 ```bash
 # Backend 헬스 체크
-curl https://lifeos-backend.<region>.azurecontainerapps.io/health
+curl https://thriveops-backend.<region>.azurecontainerapps.io/health
 # Expected: {"status":"healthy","timestamp":"..."}
 
 # Frontend 접근성 확인
-curl https://lifeos-frontend.<region>.azurecontainerapps.io
+curl https://thriveops-frontend.<region>.azurecontainerapps.io
 # Expected: HTML 페이지
 
 # 로그 확인
-az containerapp logs show --name lifeos-backend --resource-group lifeos-rg
+az containerapp logs show --name thriveops-backend --resource-group thriveops-rg
 ```
 
 ---
@@ -280,8 +280,8 @@ az containerapp logs show --name lifeos-backend --resource-group lifeos-rg
 ### 테스트 배포하기
 ```bash
 # 로컬 환경에서 Docker 이미지 테스트
-docker build -f Dockerfile -t lifeos-backend:test .
-docker build -f Dockerfile.frontend -t lifeos-frontend:test .
+docker build -f Dockerfile -t thriveops-backend:test .
+docker build -f Dockerfile.frontend -t thriveops-frontend:test .
 ```
 
 ### 배포 전 검증

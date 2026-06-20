@@ -8,8 +8,8 @@ on:
 
 env:
   REGISTRY: ${{ secrets.AZURE_REGISTRY_URL }}
-  BACKEND_IMAGE_NAME: lifeos-backend
-  FRONTEND_IMAGE_NAME: lifeos-frontend
+  BACKEND_IMAGE_NAME: thriveops-backend
+  FRONTEND_IMAGE_NAME: thriveops-frontend
 
 jobs:
   build-and-deploy:
@@ -64,7 +64,7 @@ jobs:
           acrPassword: ${{ secrets.AZURE_REGISTRY_PASSWORD }}
           imageToDeploy: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:${{ github.sha }}
           resourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP }}
-          containerAppName: lifeos-backend
+          containerAppName: thriveops-backend
           containerAppEnvironment: ${{ secrets.AZURE_CONTAINER_APP_ENV }}
           targetPort: 3001
 

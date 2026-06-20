@@ -1,4 +1,4 @@
-# LifeOS Insight Coach - Deployment Guide
+# ThriveOps - Deployment Guide
 
 ## Prerequisites
 
@@ -28,12 +28,12 @@ npm run dev:be   # Backend on http://localhost:3001
 1. **Set up GitHub Secrets** in your repository settings:
    ```
    AZURE_SUBSCRIPTION_ID=<your-subscription-id>
-   AZURE_RESOURCE_GROUP=lifeos-rg
-   AZURE_REGISTRY_NAME=lifeosregistry
+   AZURE_RESOURCE_GROUP=thriveops-rg
+   AZURE_REGISTRY_NAME=thriveopsregistry
    AZURE_REGISTRY_USERNAME=<registry-username>
    AZURE_REGISTRY_PASSWORD=<registry-password>
    AZURE_BACKEND_URL=<deployment-backend-url>
-   AZURE_CONTAINER_APP_ENV=lifeos-env
+   AZURE_CONTAINER_APP_ENV=thriveops-env
    ```
 
 2. **Push to main branch** to trigger the workflow:
@@ -59,10 +59,10 @@ npm run dev:be   # Backend on http://localhost:3001
 3. **Deploy Container Apps**:
    ```bash
    az containerapp create \
-     --name lifeos-backend \
-     --resource-group lifeos-rg \
-     --image <registry-url>/lifeos-backend:latest \
-     --environment lifeos-env \
+     --name thriveops-backend \
+     --resource-group thriveops-rg \
+     --image <registry-url>/thriveops-backend:latest \
+     --environment thriveops-env \
      --target-port 3001 \
      --ingress external
    ```
@@ -95,10 +95,10 @@ curl https://<frontend-url>
 
 - **Build fails**: Check Node.js version (should be 18+)
 - **Registry auth fails**: Verify ACR credentials in secrets
-- **Container won't start**: Check logs: `az containerapp logs show --name lifeos-backend --resource-group lifeos-rg`
+- **Container won't start**: Check logs: `az containerapp logs show --name thriveops-backend --resource-group thriveops-rg`
 
 ## Cleanup
 
 ```bash
-az group delete --name lifeos-rg --yes
+az group delete --name thriveops-rg --yes
 ```

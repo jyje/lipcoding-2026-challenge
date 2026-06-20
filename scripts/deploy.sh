@@ -2,12 +2,12 @@
 set -e
 
 # Configuration
-RESOURCE_GROUP="${AZURE_RESOURCE_GROUP:-lifeos-rg}"
+RESOURCE_GROUP="${AZURE_RESOURCE_GROUP:-thriveops-rg}"
 LOCATION="${AZURE_LOCATION:-eastus}"
-REGISTRY_NAME="${AZURE_REGISTRY_NAME:-lifeosregistry}"
-APP_NAME="lifeos"
+REGISTRY_NAME="${AZURE_REGISTRY_NAME:-thriveopsregistry}"
+APP_NAME="thriveops"
 
-echo "🚀 Deploying LifeOS to Azure..."
+echo "🚀 Deploying ThriveOps to Azure..."
 echo "Region: $LOCATION"
 echo "Resource Group: $RESOURCE_GROUP"
 

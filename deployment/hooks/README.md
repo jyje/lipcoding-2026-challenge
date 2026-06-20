@@ -164,7 +164,7 @@ npm install
 2. 환경 변수 설정 확인
 3. 컨테이너 로그 확인:
    ```bash
-   az containerapp logs show --name lifeos-backend --resource-group lifeos-rg
+   az containerapp logs show --name thriveops-backend --resource-group thriveops-rg
    ```
 
 ### 특정 에이전트가 활성화되지 않음
