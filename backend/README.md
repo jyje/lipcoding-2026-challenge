@@ -1,4 +1,4 @@
-# 에브 라이트 옵스 Backend (FastAPI + uv)
+# ThriveOps Backend (FastAPI + uv)
 
 ## 실행
 

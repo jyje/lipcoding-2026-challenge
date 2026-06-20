@@ -1,7 +1,7 @@
 {
-  "name": "lifeos-backend",
+  "name": "thriveops-backend",
   "version": "0.1.0",
-  "description": "LifeOS Insight Coach backend API",
+  "description": "ThriveOps backend API",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",

@@ -67,3 +67,24 @@ class SpaceGoal(BaseModel):
 class GoalOverviewResponse(BaseModel):
     goals: list[SpaceGoal]
 
+
+class AnalyzeRequest(BaseModel):
+    brain_dump: str = Field(min_length=5, max_length=4000)
+    time_budget_min: int = Field(default=120, ge=15, le=600)
+
+
+class AnalyzeAction(BaseModel):
+    id: str
+    title: str
+    reason: str
+    priority: Literal[1, 2, 3]
+    estimate_min: int = Field(ge=15, le=240)
+    done: bool = False
+
+
+class AnalyzeResponse(BaseModel):
+    summary: str
+    top_actions: list[AnalyzeAction]
+    risks: list[str]
+    time_budget_min: int
+

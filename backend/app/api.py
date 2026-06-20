@@ -4,7 +4,16 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.models import GoalOverviewResponse, Space, TaskCreate, TaskRead, TaskUpdate
+from app.auth import AuthContext, require_bearer_auth
+from app.models import (
+    AnalyzeRequest,
+    AnalyzeResponse,
+    GoalOverviewResponse,
+    Space,
+    TaskCreate,
+    TaskRead,
+    TaskUpdate,
+)
 from app.service import TaskService
 
 
@@ -75,6 +84,32 @@ def build_router(get_service):
         service: TaskService = Depends(get_service),
     ) -> GoalOverviewResponse:
         return await service.goal_overview()
+
+    @router.post(
+        "/analyze",
+        response_model=AnalyzeResponse,
+        summary="브레인 덤프를 분석해 상위 액션과 리스크를 반환",
+    )
+    async def analyze(
+        payload: AnalyzeRequest,
+        service: TaskService = Depends(get_service),
+        _auth: AuthContext = Depends(require_bearer_auth),
+    ) -> AnalyzeResponse:
+        return await service.analyze(payload)
+
+    @router.get(
+        "/insights/latest",
+        response_model=AnalyzeResponse,
+        summary="가장 최근 분석 결과 조회",
+    )
+    async def latest_insight(
+        service: TaskService = Depends(get_service),
+        _auth: AuthContext = Depends(require_bearer_auth),
+    ) -> AnalyzeResponse:
+        result = await service.latest_insight()
+        if result is None:
+            raise HTTPException(status_code=404, detail="No insight found")
+        return result
 
     return router
 

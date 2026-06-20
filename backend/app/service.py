@@ -2,13 +2,26 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from app.models import GoalOverviewResponse, Space, SpaceGoal, TaskCreate, TaskRead, TaskStatus, TaskUpdate
+from app.analysis import HeuristicAnalyzer
+from app.models import (
+    AnalyzeRequest,
+    AnalyzeResponse,
+    GoalOverviewResponse,
+    Space,
+    SpaceGoal,
+    TaskCreate,
+    TaskRead,
+    TaskStatus,
+    TaskUpdate,
+)
 from app.repository import TaskRepository
 
 
 class TaskService:
-    def __init__(self, repository: TaskRepository) -> None:
+    def __init__(self, repository: TaskRepository, analyzer: HeuristicAnalyzer | None = None) -> None:
         self._repository = repository
+        self._analyzer = analyzer or HeuristicAnalyzer()
+        self._latest_insight: AnalyzeResponse | None = None
 
     async def create_task(self, space: Space, payload: TaskCreate) -> TaskRead:
         entity = await self._repository.create(space, payload)
@@ -40,4 +53,15 @@ class TaskService:
                 )
             )
         return GoalOverviewResponse(goals=goals)
+
+    async def analyze(self, payload: AnalyzeRequest) -> AnalyzeResponse:
+        result = self._analyzer.analyze(
+            brain_dump=payload.brain_dump,
+            time_budget_min=payload.time_budget_min,
+        )
+        self._latest_insight = result
+        return result
+
+    async def latest_insight(self) -> AnalyzeResponse | None:
+        return self._latest_insight
 

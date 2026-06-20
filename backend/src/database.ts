@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 
 // SQLite 데이터베이스 연결
-const dbPath = process.env.DB_PATH || path.join(process.cwd(), 'backend/data/lifeos.db');
+const dbPath = process.env.DB_PATH || path.join(process.cwd(), 'backend/data/thriveops.db');
 
 // Ensure data directory exists
 const dataDir = path.dirname(dbPath);
