@@ -2043,6 +2043,10 @@ export default function Home() {
                     gap: '8px',
                     paddingRight: '4px',
                   }}
+                  role="log"
+                  aria-live="polite"
+                  aria-relevant="additions text"
+                  aria-atomic="false"
                 >
                   {chatMessages.map((message) => (
                     <div
@@ -2067,6 +2071,24 @@ export default function Home() {
                   ))}
                 </div>
 
+                <p
+                  id="dialog-a11y-help"
+                  style={{
+                    position: 'absolute',
+                    width: '1px',
+                    height: '1px',
+                    padding: 0,
+                    margin: '-1px',
+                    overflow: 'hidden',
+                    clip: 'rect(0, 0, 0, 0)',
+                    whiteSpace: 'nowrap',
+                    border: 0,
+                  }}
+                >
+                  이 대화창은 업무 등록, URL 붙여넣기, 파일 드롭, AI 태깅에 사용할 수 있습니다.
+                  Enter를 누르면 등록되고 Shift+Enter를 누르면 줄바꿈합니다.
+                </p>
+
                 <div
                   style={{
                     display: 'grid',
@@ -2086,6 +2108,7 @@ export default function Home() {
                     }}
                     placeholder="업무·URL 붙여넣기, 여러 줄 입력, 파일 드롭으로 티켓 등록 (Enter 등록 · Shift+Enter 줄바꿈)"
                     rows={1}
+                    aria-describedby="dialog-a11y-help"
                     style={{
                       width: '100%',
                       resize: 'none',
