@@ -1,6 +1,6 @@
-# LifeOS Insight Coach - 개발 계획
+# ThriveOps - 개발 계획
 
-이 폴더는 대회용 앱 `LifeOS Insight Coach`의 기획, 구현, 데모, 운영 계획을 담습니다.
+이 폴더는 대회용 앱 `ThriveOps`의 기획, 구현, 데모, 운영 계획을 담습니다.
 
 ## 문서 인덱스
 

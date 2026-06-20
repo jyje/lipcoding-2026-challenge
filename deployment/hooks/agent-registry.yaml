@@ -1,0 +1,95 @@
+# Agent Event Hooks Configuration
+# Copilot 에이전트가 특정 이벤트에 응답하도록 설정
+
+version: 1.0
+
+hooks:
+  # Frontend 에이전트 훅
+  - id: fe-on-frontend-change
+    name: "Frontend Agent - File Change Hook"
+    event: file-change
+    path: "frontend/**"
+    agent: frontend
+    action: validate-and-build
+    commands:
+      - npm run typecheck --workspace=frontend
+      - npm run build --workspace=frontend
+
+  # Backend 에이전트 훅
+  - id: be-on-backend-change
+    name: "Backend Agent - File Change Hook"
+    event: file-change
+    path: "backend/**"
+    agent: backend
+    action: validate-and-build
+    commands:
+      - npm run typecheck --workspace=backend
+      - npm run build --workspace=backend
+
+  # Deployment 에이전트 훅
+  - id: deploy-on-main-push
+    name: "Deployment Agent - Main Branch Hook"
+    event: push
+    branch: main
+    agent: deployment
+    action: auto-deploy
+    commands:
+      - bash deployment/hooks/pre-deploy.sh
+      - npm run build
+      - bash deployment/hooks/health-check.sh
+
+  # Code Review 에이전트 훅
+  - id: review-on-pr
+    name: "Review Agent - PR Hook"
+    event: pull-request
+    agent: code-review
+    action: review-changes
+    conditions:
+      - branch-prefix: "feat/"
+      - has-tests: true
+
+  # Integration 에이전트 훅
+  - id: integrate-on-contract-change
+    name: "Integration Agent - Shared Contract Hook"
+    event: file-change
+    path: "shared/**"
+    agent: integration
+    action: sync-types
+    commands:
+      - npm run typecheck
+
+agents:
+  frontend:
+    display: "Frontend Agent"
+    tracks: [fe]
+    auto-activate: true
+    on-events:
+      - fe-on-frontend-change
+
+  backend:
+    display: "Backend Agent"
+    tracks: [be]
+    auto-activate: true
+    on-events:
+      - be-on-backend-change
+
+  deployment:
+    display: "Deployment Agent"
+    tracks: [ops]
+    auto-activate: false
+    on-events:
+      - deploy-on-main-push
+
+  code-review:
+    display: "Code Review Agent"
+    tracks: [all]
+    auto-activate: false
+    on-events:
+      - review-on-pr
+
+  integration:
+    display: "Integration Agent"
+    tracks: [integration]
+    auto-activate: true
+    on-events:
+      - integrate-on-contract-change

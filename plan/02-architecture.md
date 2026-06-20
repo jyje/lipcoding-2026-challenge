@@ -59,6 +59,41 @@ flowchart LR
 - `startAt: string`
 - `durationMin: number`
 
+### JobPosting (채용 공고)
+
+- `id: string`
+- `company: string`
+- `title: string`
+- `rawText: string`
+- `skills: string[]` (추출된 요구 역량)
+- `seededAt: string`
+
+### SkillRequirement (요구 역량)
+
+- `id: string`
+- `name: string`
+- `demandCount: number` (사전 설정 공고 중 요구 빈도)
+- `sourceJobIds: string[]`
+
+### KnowledgeEntry (지식기반 항목)
+
+- `id: string`
+- `title: string`
+- `content: string`
+- `tags: string[]`
+- `sourceProblemId?: string` (해결 과정에서 파생된 경우)
+- `createdAt: string`
+- `updatedAt: string`
+
+### LearningCycle (자동 반복 학습 루프 1회)
+
+- `id: string`
+- `problem: string`
+- `usedKnowledgeIds: string[]` (해결에 활용한 지식)
+- `newKnowledgeIds: string[]` (축적된 신규 지식)
+- `matchedSkills: string[]` (채용 공고 역량과 매칭)
+- `ranAt: string`
+
 ## 4) API 계약 (MVP)
 
 ### POST /api/analyze
@@ -110,6 +145,26 @@ flowchart LR
 ### POST /api/replan
 
 - 남은 시간 기준 재계획
+
+### GET /api/jobs/skills
+
+- 사전 설정된 약 10개 회사 채용 공고에서 추출한 요구 역량 집계 반환
+- 응답: `SkillRequirement[]` (역량명 + 요구 빈도 + 출처 공고)
+
+### POST /api/knowledge/solve
+
+- 입력 문제를 기존 지식기반으로 해결 시도
+- 해결 결과 + 활용 지식 + 신규 축적 지식을 함께 반환
+- 동작: 지식기반 검색 → 해결안 생성 → 신규 지식 `KnowledgeEntry`로 축적
+
+### GET /api/knowledge
+
+- 누적된 지식기반 항목 조회 (검색/태그 필터)
+
+### POST /api/loop/run
+
+- 역량 분석 → 문제 해결 → 지식 축적 과정을 1회 실행하고 `LearningCycle` 기록 반환
+- 반복 실행 시 지식기반과 커리어 역량 매칭이 함께 누적됨
 
 ## 5) AI 출력 강제 전략
 

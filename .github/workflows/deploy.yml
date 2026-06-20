@@ -21,6 +21,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Run Pre-deployment Hook
+        run: bash deployment/hooks/pre-deploy.sh
+
       - name: Log in to Azure Container Registry
         uses: azure/docker-login@v1
         with:
@@ -60,17 +68,19 @@ jobs:
           containerAppEnvironment: ${{ secrets.AZURE_CONTAINER_APP_ENV }}
           targetPort: 3001
 
-      - name: Health Check
+      - name: Run Post-deployment Hook
+        env:
+          AZURE_BACKEND_URL: ${{ secrets.AZURE_BACKEND_URL }}
+          AZURE_FRONTEND_URL: ${{ secrets.AZURE_FRONTEND_URL }}
+        run: bash deployment/hooks/health-check.sh
+
+      - name: Deployment Summary
+        if: success()
         run: |
-          BACKEND_URL=${{ secrets.AZURE_BACKEND_URL }}/health
-          echo "Checking health at: $BACKEND_URL"
-          for i in {1..30}; do
-            if curl -f $BACKEND_URL; then
-              echo "Health check passed"
-              exit 0
-            fi
-            echo "Attempt $i/30 failed, retrying..."
-            sleep 10
-          done
-          echo "Health check failed after 30 attempts"
-          exit 1
+          echo "✅ Deployment Pipeline Completed"
+          echo ""
+          echo "📋 Deployment Information:"
+          echo "  Backend: ${{ secrets.AZURE_BACKEND_URL }}"
+          echo "  Frontend: ${{ secrets.AZURE_FRONTEND_URL }}"
+          echo "  Deployment ID: ${{ github.sha }}"
+          echo "  Timestamp: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"

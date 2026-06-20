@@ -41,6 +41,11 @@
 - 헬스체크
 - 환경변수 검증
 
+5. 커리어 루프 핵심 기능
+- 채용 공고 시드(약 10개) + 요구 역량 추출 (`GET /api/jobs/skills`)
+- 지식기반 문제 해결 + 신규 지식 축적 (`POST /api/knowledge/solve`, `GET /api/knowledge`)
+- 자동 반복 학습 루프 1회 실행/기록 (`POST /api/loop/run`)
+
 ## 통합 트랙
 
 1. 공통 타입 싱크

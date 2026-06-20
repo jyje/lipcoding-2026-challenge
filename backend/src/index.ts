@@ -1,5 +1,7 @@
 import Fastify from 'fastify';
-import cors from 'fastify-cors';
+import cors from '@fastify/cors';
+import { initializeDatabase } from './database';
+import { registerUserRoutes } from './routes/user';
 
 const app = Fastify({ logger: true });
 
@@ -79,9 +81,17 @@ app.post<{
 
 const start = async () => {
   try {
+    // 데이터베이스 초기화
+    console.log('📦 Initializing database...');
+    await initializeDatabase();
+
+    // 사용자 라우트 등록
+    console.log('👤 Registering user routes...');
+    await registerUserRoutes(app);
+
     const port = parseInt(process.env.PORT || '3001', 10);
     await app.listen({ port, host: '0.0.0.0' });
-    console.log(`Server listening on port ${port}`);
+    console.log(`✅ Server listening on port ${port}`);
   } catch (err) {
     app.log.error(err);
     process.exit(1);
