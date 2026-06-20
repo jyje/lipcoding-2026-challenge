@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@copilot-extensions/preview-sdk": "^0.1.0",
-    "fastify": "^4.25.0",
+    "fastify": "^5.8.5",
     "fastify-cors": "^8.4.2",
     "zod": "^3.22.0"
   },
@@ -20,7 +20,7 @@
     "@types/node": "^20.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0",
-    "vitest": "^1.0.0",
+    "vitest": "^4.1.9",
     "eslint": "^8.0.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0"
