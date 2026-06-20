@@ -1,7 +1,7 @@
 {
-  "name": "lifeos-frontend",
+  "name": "thriveops-frontend",
   "version": "0.1.0",
-  "description": "LifeOS Insight Coach frontend",
+  "description": "ThriveOps frontend",
   "private": true,
   "scripts": {
     "dev": "next dev",
