@@ -4,6 +4,7 @@ import { initializeDatabase } from './database';
 import { registerUserRoutes } from './routes/user';
 import { analyzeBrainDump } from './services/analyzeService';
 import { authenticateBearer } from './middleware/auth';
+import { loadConfig, validateConfig } from './config';
 import 'dotenv/config';
 
 const app = Fastify({ logger: true });
@@ -216,6 +217,19 @@ app.post<{
 
 const start = async () => {
   try {
+    // 설정 로드 및 검증
+    console.log('⚙️  Loading configuration...');
+    const config = loadConfig();
+    
+    const validationErrors = validateConfig(config);
+    if (validationErrors.length > 0) {
+      console.error('Configuration validation failed:');
+      validationErrors.forEach(error => console.error(`  - ${error}`));
+      process.exit(1);
+    }
+    
+    console.log(`✅ Configuration loaded (env: ${config.nodeEnv})`);
+
     // 데이터베이스 초기화
     console.log('📦 Initializing database...');
     await initializeDatabase();
@@ -224,9 +238,8 @@ const start = async () => {
     console.log('👤 Registering user routes...');
     await registerUserRoutes(app);
 
-    const port = parseInt(process.env.PORT || '8010', 10);
-    await app.listen({ port, host: '0.0.0.0' });
-    console.log(`✅ Server listening on port ${port}`);
+    await app.listen({ port: config.port, host: '0.0.0.0' });
+    console.log(`✅ Server listening on port ${config.port}`);
   } catch (err) {
     app.log.error(err);
     process.exit(1);

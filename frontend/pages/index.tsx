@@ -538,13 +538,7 @@ export default function Home() {
   const [name, setName] = useState('');
   const [draftName, setDraftName] = useState('');
   const [tasks, setTasks] = useState<PlannerTask[]>(() => buildSeedTasks(new Date()));
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => [
-    {
-      id: 'chat-1',
-      role: 'assistant',
-      text: '여기에 업무를 입력하면 티켓으로 등록됩니다. 자세한 사용법은 위 “?”를 눌러 확인하세요.',
-    },
-  ]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [messageDraft, setMessageDraft] = useState('');
   const [apiToken, setApiToken] = useState(defaultBearer);
   const [jobs, setJobs] = useState<JobPosting[]>([]);
@@ -1315,7 +1309,6 @@ export default function Home() {
                       text="카드는 상태 칸으로 드래그하고, 파란 날짜를 클릭하면 일정을 바꿀 수 있습니다."
                     />
                   </div>
-
                   <div
                     style={{
                       padding: '10px 12px',
@@ -1619,7 +1612,7 @@ export default function Home() {
                   <ul style={{ margin: 0, paddingLeft: '18px', color: '#4b5563', lineHeight: 1.8 }}>
                     <li>카드 드래그: 상태 변경</li>
                     <li>파란 날짜 클릭: 일정 변경</li>
-                    <li>하단 입력함: 붙여넣기·파일 드롭으로 티켓 등록</li>
+                    <li>대화창: 업무 등록 · URL 붙여넣기 · 파일 드롭 · AI 태깅</li>
                   </ul>
                 </div>
               </div>
@@ -1642,14 +1635,11 @@ export default function Home() {
                     flexWrap: 'wrap',
                   }}
                 >
-                  <div>
-                    <h2 style={{ margin: '0 0 8px', fontSize: '26px' }}>커리어</h2>
-                    <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>
-                      <HelpHint
-                        label="사용법"
-                        text="관심 채용공고를 업무와 분리해 별도로 관리합니다. 링크나 “회사 - 직무”를 붙여넣어 직접 수집하세요."
-                      />
-                    </p>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                    <h2 style={{ margin: 0, fontSize: '26px' }}>커리어</h2>
+                    <HelpHint
+                      text="관심 채용공고를 업무와 분리해 별도로 관리합니다. 링크나 '회사 - 직무'를 붙여넣어 직접 수집하세요."
+                    />
                   </div>
                   <div
                     style={{
@@ -2014,36 +2004,34 @@ export default function Home() {
                 style={{
                   display: 'flex',
                   alignItems: 'baseline',
-                  justifyContent: 'space-between',
+                  justifyContent: 'flex-start',
                   gap: '12px',
                   marginBottom: '12px',
                 }}
               >
-                <div>
+                <h3
+                  style={{
+                    margin: '4px 0 0',
+                    fontSize: '18px',
+                    color: '#fff',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  대화창
                   <span
                     style={{
                       fontSize: '12px',
-                      letterSpacing: '0.08em',
-                      textTransform: 'uppercase',
+                      fontWeight: 500,
                       color: '#94a3b8',
                     }}
                   >
-                    대화창
+                    이 대화창에서는 업무 등록, URL 붙여넣기, 파일 드롭, AI 태깅을 사용할 수 있습니다.
                   </span>
-                  <h3
-                    style={{
-                      margin: '4px 0 0',
-                      fontSize: '18px',
-                      color: '#fff',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                    }}
-                  >
-                    하단 고정 · 티켓 입력함
-                    <HelpHint text="업무·URL을 붙여넣거나 파일을 드롭하면 티켓으로 등록됩니다. 날짜는 카드의 파란 날짜를 클릭해 지정하세요." />
-                  </h3>
-                </div>
+                  <HelpHint text="업무 등록, URL 붙여넣기, 파일 드롭, AI 태깅을 이 대화창에서 사용할 수 있습니다." />
+                </h3>
               </div>
 
               <div style={{ display: 'grid', gap: '12px' }}>
