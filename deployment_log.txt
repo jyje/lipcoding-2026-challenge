@@ -1,0 +1,10 @@
+🚀 Deploying ThriveOps to Azure...
+Region: eastus
+Resource Group: thriveops-rg
+📁 Creating resource group...
+/opt/homebrew/Cellar/azure-cli/2.87.0/libexec/lib/python3.13/site-packages/azure/mgmt/resource/deploymentstacks/models/_models.py:119: SyntaxWarning: invalid escape sequence '\/'
+  following actions are automatically appended to 'excludedActions': '*\/read' and
+ERROR: Please run 'az login' to setup account.
+🏗️ Creating Azure Container Registry...
+ERROR: Please run 'az login' to setup account.
+ERROR: Please run 'az login' to setup account.

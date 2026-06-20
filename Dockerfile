@@ -7,8 +7,9 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install dependencies
-COPY backend/package*.json ./
-RUN npm ci
+COPY backend/package.json ./
+COPY package-lock.json ./
+RUN npm ci --legacy-peer-deps
 
 # Copy source and build
 COPY backend/src ./src
