@@ -131,6 +131,89 @@ app.post<{
   }
 });
 
+// Goals overview endpoint
+app.get('/api/v1/goals/overview', async (request, reply) => {
+  // Return overview of goals by space (work, career, tech)
+  // For now, return empty structure - frontend will handle empty state
+  return {
+    goals: [
+      {
+        space: 'work' as const,
+        top_task: null,
+      },
+      {
+        space: 'career' as const,
+        top_task: null,
+      },
+      {
+        space: 'tech' as const,
+        top_task: null,
+      },
+    ],
+  };
+});
+
+// Agent chat endpoint
+app.post<{
+  Body: {
+    message: string;
+    tasks?: Array<{
+      id: string;
+      title: string;
+      description: string;
+      status: string;
+      priority: number;
+      space: string;
+    }>;
+  };
+}>('/api/v1/agent/chat', async (request, reply) => {
+  const token = await authenticateBearer(request, reply);
+  if (!token) {
+    return reply.status(401).send({
+      detail: {
+        type: 'missing_token',
+        message: 'Authorization header with Bearer token is required',
+      },
+    });
+  }
+
+  const { message, tasks } = request.body;
+
+  if (!message || message.trim().length === 0) {
+    return reply.status(400).send({
+      detail: {
+        type: 'missing_message',
+        message: 'message is required',
+      },
+    });
+  }
+
+  try {
+    // Call Copilot SDK for agent chat response
+    const result = await analyzeBrainDump(message, 60);
+
+    return {
+      reply: `분석 완료: ${result.summary}`,
+      changes: [
+        {
+          type: 'reply_only' as const,
+          target_id: 'agent',
+          field: 'reply',
+          value: result.summary,
+        },
+      ],
+    };
+  } catch (error) {
+    app.log.error(error);
+    return reply.status(500).send({
+      detail: {
+        type: 'agent_error',
+        message: error instanceof Error ? error.message : 'Failed to get agent response',
+      },
+    });
+  }
+});
+
 const start = async () => {
   try {
     // 데이터베이스 초기화

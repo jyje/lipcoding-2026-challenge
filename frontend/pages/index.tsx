@@ -1309,14 +1309,11 @@ export default function Home() {
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
-                  <div>
-                    <h2 style={{ margin: '0 0 8px', fontSize: '26px' }}>업무</h2>
-                    <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>
-                      <HelpHint
-                        label="사용법"
-                        text="카드는 상태 칸으로 드래그하고, 파란 날짜를 클릭하면 일정을 바꿀 수 있습니다."
-                      />
-                    </p>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                    <h2 style={{ margin: 0, fontSize: '26px' }}>업무</h2>
+                    <HelpHint
+                      text="카드는 상태 칸으로 드래그하고, 파란 날짜를 클릭하면 일정을 바꿀 수 있습니다."
+                    />
                   </div>
 
                   <div
