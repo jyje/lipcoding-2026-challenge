@@ -34,9 +34,9 @@
 git switch main && git pull
 
 # 트랙별 worktree 생성 (에이전트마다 별도 폴더 + 별도 브랜치)
-git worktree add ../lifeos-fe   -b feat/fe-skeleton
-git worktree add ../lifeos-be   -b feat/be-skeleton
-git worktree add ../lifeos-ops  -b feat/ops-deploy
+git worktree add ../thriveops-fe   -b feat/fe-skeleton
+git worktree add ../thriveops-be   -b feat/be-skeleton
+git worktree add ../thriveops-ops  -b feat/ops-deploy
 ```
 
 - 각 에이전트는 자기 worktree 폴더 안에서만 명령을 실행한다.

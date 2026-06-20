@@ -14,7 +14,7 @@
 flowchart LR
   U[User Web UI] --> FE[Next.js]
   FE --> API[Fastify API]
-  C[Copilot Chat @lifeos] --> AGENT[Copilot Agent Endpoint]
+  C[Copilot Chat @thriveops] --> AGENT[Copilot Agent Endpoint]
   AGENT --> API
   API --> DB[(SQLite)]
   API --> LLM[Copilot SDK Model]
